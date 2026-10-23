@@ -151,8 +151,9 @@ In `${XDG_STATE_HOME:-~/.local/state}/esemczak-battery/`:
 
 ## Charge settings and reboots
 
-Whether the firmware keeps the charge mode and thresholds across a reboot has
-not yet been verified on reboot. If they reset, re-apply them from the panel.
+On Dell laptops the charge mode and thresholds are stored by the firmware and
+survive a reboot (verified with Custom mode at 50–69%). Other vendors'
+drivers may reset them at boot; if yours do, re-apply them from the panel.
 
 ## Remove
 
