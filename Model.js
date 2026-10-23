@@ -404,6 +404,31 @@ function evaluateAlerts(snapshot, samples, state, settings, now) {
   return { state: st, notifications: notifications }
 }
 
+// ---- theme palette -----------------------------------------------------------
+
+function parseThemeColors(text) {
+  var out = {}
+  var lines = String(text || "").split("\n")
+  for (var i = 0; i < lines.length; i++) {
+    var m = /^\s*([A-Za-z0-9_]+)\s*=\s*"(#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3}))"\s*(?:#.*)?$/.exec(lines[i])
+    if (m) out[m[1].toLowerCase()] = m[2]
+  }
+  return out
+}
+
+function semanticColors(palette, fallback) {
+  var p = palette || {}
+  var f = fallback || {}
+  return {
+    good: p.green || f.accent,
+    warn: p.red || f.urgent,
+    neutral: p.accent || f.accent,
+    power: p.cyan || p.blue || f.accent,
+    text: p.foreground || f.foreground,
+    muted: p.muted || f.muted
+  }
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     PLUGIN_ID: PLUGIN_ID, stateDir: stateDir,
@@ -416,6 +441,7 @@ if (typeof module !== "undefined" && module.exports) {
     parseHistory: parseHistory, dailyMedians: dailyMedians, wearRate: wearRate,
     projectFloorDate: projectFloorDate, chartPoints: chartPoints, nextRange: nextRange,
     formatMonthYear: formatMonthYear,
+    parseThemeColors: parseThemeColors, semanticColors: semanticColors,
     settingsFrom: settingsFrom, settingsFromShellConfig: settingsFromShellConfig, evaluateAlerts: evaluateAlerts, limitModeIgnored: limitModeIgnored
   }
 }

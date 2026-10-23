@@ -358,3 +358,31 @@ test("overcharge never fires without a threshold (end null)", () => {
   assert.equal(r.state.alerts.limitIgnored.active, false)
   assert.ok(!/null/.test(r.state.alerts.limitIgnored.text || ""))
 })
+
+test("parseThemeColors reads hex colours from colors.toml", () => {
+  const text = require("node:fs").readFileSync(require("node:path").join(__dirname, "fixtures", "colors.toml"), "utf8")
+  const p = Model.parseThemeColors(text)
+  assert.equal(p.green, "#87a9b0")
+  assert.equal(p.red, "#c38b7b")
+  assert.equal(p.mode, undefined)
+})
+
+test("parseThemeColors ignores comments and junk, handles hex lengths", () => {
+  assert.deepEqual(Model.parseThemeColors(""), {})
+  const p = Model.parseThemeColors('# green = "#111111"\nJunk line\nRED = "#abc"\nx = #123456\nblue = "#11223344"\nmode = "dark"\nbad = "#12345"\n')
+  assert.deepEqual(p, { red: "#abc", blue: "#11223344" })
+})
+
+test("semanticColors maps palette with fallbacks", () => {
+  const fb = { accent: "#aaaaaa", urgent: "#bb0000", foreground: "#ffffff", muted: "#777777" }
+  const s = Model.semanticColors({}, fb)
+  assert.equal(s.good, "#aaaaaa")
+  assert.equal(s.warn, "#bb0000")
+  assert.equal(s.neutral, "#aaaaaa")
+  assert.equal(s.power, "#aaaaaa")
+  assert.equal(s.text, "#ffffff")
+  assert.equal(s.muted, "#777777")
+  const full = Model.semanticColors({ green: "#01", red: "#02", accent: "#03", cyan: "#04", blue: "#05", foreground: "#06", muted: "#07" }, fb)
+  assert.deepEqual(full, { good: "#01", warn: "#02", neutral: "#03", power: "#04", text: "#06", muted: "#07" })
+  assert.equal(Model.semanticColors({ blue: "#05" }, fb).power, "#05")
+})
