@@ -429,6 +429,88 @@ function semanticColors(palette, fallback) {
   }
 }
 
+// ---- Power use (per-app share of measured draw) ----
+var UNIT_NAMES = { "brave": "Brave", "xdg-terminal-exec": "Terminal", "code": "Code", "zen": "Zen", "firefox": "Firefox",
+  "chromium": "Chromium", "obsidian": "Obsidian", "spotify": "Spotify", "nautilus": "Files" }
+
+function parsePowerSample(text) {
+  try {
+    var o = JSON.parse(text)
+    return (o && typeof o === "object" && Array.isArray(o.groups)) ? o : null
+  } catch (e) { return null }
+}
+
+function unitLabel(path) {
+  var seg = String(path).split("/").pop()
+  seg = seg.replace(/\\x([0-9a-fA-F]{2})/g, function (_, h) { return String.fromCharCode(parseInt(h, 16)) })
+  if (seg === "wayland-wm@hyprland.desktop.service") return "Desktop"
+  if (/^session-\d+\.scope$/.test(seg)) return "Login session"
+  var m = /^app-(.+)\.scope$/.exec(seg)
+  if (m) {
+    var inner = m[1]
+    var parts = inner.split("-")
+    // app-<launcher>-<name>-<hex>: name sits between the launcher and the trailing hex id
+    var hm = /^[^-.]+-(.+)-[0-9a-fA-F]+$/.exec(inner)
+    if (hm && UNIT_NAMES[hm[1]]) return UNIT_NAMES[hm[1]]
+    if (hm && !/\./.test(inner)) return cap(hm[1])
+    // app-<reverse.dns.Name>-<n>
+    var dm = /^(.+\..+?)-\d+$/.exec(inner)
+    if (dm) { var labels = dm[1].split("."); return labels[labels.length - 1] }
+    if (UNIT_NAMES[parts[0]]) return UNIT_NAMES[parts[0]]
+  }
+  seg = seg.replace(/^app-/, "").replace(/@.*$/, "").replace(/\.(service|scope|slice)$/, "")
+  return cap(seg)
+}
+
+function cap(s) { return s.length ? s.charAt(0).toUpperCase() + s.slice(1) : s }
+
+function appShares(samples) {
+  if (!samples || samples.length < 2) return []
+  var first = samples[0], last = samples[samples.length - 1]
+  var start = {}
+  for (var i = 0; i < first.groups.length; i++) start[first.groups[i].path] = first.groups[i].usec
+  var sums = {}, total = 0
+  for (var j = 0; j < last.groups.length; j++) {
+    var g = last.groups[j]
+    if (!(g.path in start)) continue
+    var d = g.usec - start[g.path]
+    if (!(d >= 0)) continue
+    var label = unitLabel(g.path)
+    sums[label] = (sums[label] || 0) + d
+    total += d
+  }
+  if (total <= 0) return []
+  return Object.keys(sums).map(function (l) { return { label: l, share: sums[l] / total } })
+    .sort(function (a, b) { return b.share - a.share })
+}
+
+function powerRows(shares, sample, n) {
+  if (!shares || !shares.length) return { mode: "measuring", rows: [] }
+  var watts = sample && typeof sample.drawW === "number"
+  var top = shares.slice(0, n)
+  var max = top[0].share
+  return {
+    mode: watts ? "watts" : "cpu",
+    rows: top.map(function (s) {
+      return {
+        label: s.label,
+        value: watts ? Math.round(s.share * sample.drawW * 10) / 10 : Math.round(s.share * 100),
+        unit: watts ? "W" : "%",
+        fraction: max > 0 ? s.share / max : 0
+      }
+    })
+  }
+}
+
+function appendDrawPoint(buffer, sample, nowMs) {
+  var out = (buffer || []).filter(function (p) { return p.t >= nowMs - 300000 })
+  if (sample && typeof sample.drawW === "number") {
+    var prev = out.length ? out[out.length - 1] : null
+    out.push({ t: nowMs, w: sample.drawW, gapBefore: prev !== null && nowMs - prev.t > 10000 })
+  }
+  return out.length > 150 ? out.slice(out.length - 150) : out
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     PLUGIN_ID: PLUGIN_ID, stateDir: stateDir,
@@ -442,6 +524,8 @@ if (typeof module !== "undefined" && module.exports) {
     projectFloorDate: projectFloorDate, chartPoints: chartPoints, nextRange: nextRange,
     formatMonthYear: formatMonthYear,
     parseThemeColors: parseThemeColors, semanticColors: semanticColors,
-    settingsFrom: settingsFrom, settingsFromShellConfig: settingsFromShellConfig, evaluateAlerts: evaluateAlerts, limitModeIgnored: limitModeIgnored
+    settingsFrom: settingsFrom, settingsFromShellConfig: settingsFromShellConfig, evaluateAlerts: evaluateAlerts, limitModeIgnored: limitModeIgnored,
+    parsePowerSample: parsePowerSample, unitLabel: unitLabel, appShares: appShares,
+    powerRows: powerRows, appendDrawPoint: appendDrawPoint
   }
 }

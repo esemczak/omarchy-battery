@@ -84,3 +84,20 @@ ha_corrupt() { local s o now; s=$(mktemp -d); now=$(date +%s%3N); printf '{"t":%
 check "history corrupt line still throttles" ha_corrupt
 ha_future() { local s o now; s=$(mktemp -d); now=$(date +%s%3N); printf '{"t":%s,"health":95}\n' "$((now + 172800000))" >"$s/history.jsonl"; o=$(BATTERY_SYSFS=tests/fixtures/sysfs/dell "$HA" "$s"); rm -rf "$s"; [[ $o == appended ]]; }
 check "history far-future last sample does not block sampling" ha_future
+
+# --- power-sample ---
+PS="$PWD/bin/power-sample.sh"
+ps_run() { POWER_UID=1000 CGROUP_ROOT="$PWD/tests/fixtures/cgroup" BATTERY_SYSFS="${1:-$PWD/tests/fixtures/sysfs/dell}" "$PS"; }
+ps_groups() { ps_run | jq -e '(.groups|length)==4 and (.groups|map(.path)|any(test("app-graphical.slice$"))|not) and (.groups|all(.usec==1000)) and (.groups|map(.path)|all(startswith("/")|not))'; }
+ps_nodraw() { ps_run | jq -e '.drawW==null and .status=="Discharging" and (.t|type=="number") and (.ac|type=="boolean")'; }
+ps_copy() { local s; s=$(mktemp -d); cp -r tests/fixtures/sysfs/dell/. "$s"; printf '%s' "$s"; }
+ps_draw() { local s rc; s=$(ps_copy); printf 531000 >"$s/BAT0/current_now"; printf 12183000 >"$s/BAT0/voltage_now"; ps_run "$s" | jq -e '.drawW>6.46 and .drawW<6.48'; rc=$?; rm -rf "$s"; return $rc; }
+ps_power_now() { local s rc; s=$(ps_copy); printf 7500000 >"$s/BAT0/power_now"; ps_run "$s" | jq -e '.drawW==7.5'; rc=$?; rm -rf "$s"; return $rc; }
+ps_charging() { local s rc; s=$(ps_copy); printf 531000 >"$s/BAT0/current_now"; printf 12183000 >"$s/BAT0/voltage_now"; printf 'Charging\n' >"$s/BAT0/status"; ps_run "$s" | jq -e '.drawW==null and .status=="Charging"'; rc=$?; rm -rf "$s"; return $rc; }
+ps_nobat() { POWER_UID=1000 CGROUP_ROOT=/nonexistent BATTERY_SYSFS="$PWD/tests/fixtures/sysfs/none" "$PS" | jq -e '.drawW==null and .groups==[]'; }
+check "power-sample leaf groups only" ps_groups
+check "power-sample no current/voltage -> drawW null" ps_nodraw
+check "power-sample current*voltage -> watts" ps_draw
+check "power-sample power_now preferred" ps_power_now
+check "power-sample Charging -> drawW null" ps_charging
+check "power-sample no battery/cgroups -> valid JSON" ps_nobat

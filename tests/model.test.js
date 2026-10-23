@@ -386,3 +386,59 @@ test("semanticColors maps palette with fallbacks", () => {
   assert.deepEqual(full, { good: "#01", warn: "#02", neutral: "#03", power: "#04", text: "#06", muted: "#07" })
   assert.equal(Model.semanticColors({ blue: "#05" }, fb).power, "#05")
 })
+
+test("unitLabel names cgroup units", () => {
+  const L = Model.unitLabel
+  assert.equal(L("user.slice/user-1000.slice/user@1000.service/app.slice/app-graphical.slice/app-Hyprland-brave-1a2b.scope"), "Brave")
+  assert.equal(L("a/app-Hyprland-xdg\\x2dterminal\\x2dexec-509c.scope"), "Terminal")
+  assert.equal(L("a/app-org.chromium.Chromium-42.scope"), "Chromium")
+  assert.equal(L("a/wayland-wm@hyprland.desktop.service"), "Desktop")
+  assert.equal(L("a/session-3.scope"), "Login session")
+  assert.equal(L("system.slice/bt-agent.service"), "Bt-agent")
+  assert.equal(L("a/dropbox@autostart.service"), "Dropbox")
+  assert.equal(L("a/app-Hyprland-nautilus-ab12.scope"), "Files")
+})
+
+const S = (t, groups, drawW) => ({ t: t, drawW: drawW === undefined ? null : drawW, groups: groups })
+const G = (path, usec) => ({ path: path, usec: usec })
+
+test("appShares merges labels, skips missing and negative", () => {
+  const a = "x/app-Hyprland-brave-1a.scope", b = "x/app-Hyprland-brave-2b.scope"
+  const c = "x/app-org.chromium.Chromium-42.scope", d = "x/gone.service", e = "x/neg.service"
+  const first = S(0, [G(a, 100), G(b, 100), G(c, 100), G(d, 0), G(e, 500)])
+  const last = S(1, [G(a, 400), G(b, 300), G(c, 300), G(e, 100)])
+  assert.deepEqual(Model.appShares([first, last]), [{ label: "Brave", share: 5 / 7 }, { label: "Chromium", share: 2 / 7 }])
+  assert.deepEqual(Model.appShares([first, S(1, [G(a, 100)])]), [])
+  assert.deepEqual(Model.appShares([first]), [])
+  assert.deepEqual(Model.appShares([]), [])
+})
+
+test("powerRows modes", () => {
+  const sh = [{ label: "A", share: 0.5 }, { label: "B", share: 0.3 }, { label: "C", share: 0.2 }]
+  const w = Model.powerRows(sh, S(1, [], 6.5), 3)
+  assert.equal(w.mode, "watts")
+  assert.deepEqual(w.rows.map(r => r.value), [3.3, 2.0, 1.3])
+  assert.deepEqual(w.rows.map(r => r.unit), ["W", "W", "W"])
+  assert.deepEqual(w.rows.map(r => r.fraction), [1, 0.6, 0.4])
+  const c = Model.powerRows(sh, S(1, [], null), 2)
+  assert.equal(c.mode, "cpu")
+  assert.deepEqual(c.rows.map(r => r.value), [50, 30].slice(0, 2))
+  assert.equal(c.rows[0].unit, "%")
+  assert.equal(Model.powerRows(Model.appShares([S(1, [G("a", 5)], 6.5)]), S(1, [], 6.5), 3).mode, "measuring")
+  assert.equal(Model.powerRows([], S(1, [], 6.5), 3).mode, "measuring")
+})
+
+test("appendDrawPoint gaps, expiry and cap", () => {
+  let b = Model.appendDrawPoint([], S(0, [], 5), 100000)
+  assert.deepEqual(b, [{ t: 100000, w: 5, gapBefore: false }])
+  b = Model.appendDrawPoint(b, S(0, [], 6), 112000)
+  assert.equal(b[1].gapBefore, true)
+  b = Model.appendDrawPoint(b, S(0, [], 7), 114000)
+  assert.equal(b[2].gapBefore, false)
+  assert.equal(Model.appendDrawPoint(b, S(0, [], null), 116000).length, 3)
+  assert.equal(Model.appendDrawPoint(b, S(0, [], 8), 100000 + 300001).length, 3 - 1 + 1)
+  let big = []
+  for (let i = 0; i < 200; i++) big = Model.appendDrawPoint(big, S(0, [], 1), 1000000 + i * 1000)
+  assert.equal(big.length, 150)
+  assert.equal(big[149].t, 1000000 + 199 * 1000)
+})
