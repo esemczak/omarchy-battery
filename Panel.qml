@@ -236,10 +236,6 @@ Panel {
     return d && d.isPresent && !UPower.onBattery && !root.batteryFlowIdle
   }
 
-  readonly property color batteryFillColor: {
-    return root.bar ? root.bar.foreground : Commons.Color.foreground
-  }
-
   // Cute agent-flavored phrases shown in the hero status line, rotated on a
   // timer so the panel feels alive when current is flowing (either direction).
   readonly property var chargingPhrases: [
@@ -571,7 +567,7 @@ Panel {
             id: heroIcon
             textFormat: Text.PlainText
             text: root.batteryIcon()
-            color: themePalette.good
+            color: (root.discharging && root.batteryFraction <= 0.2) ? themePalette.warn : themePalette.good
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.display
             anchors.left: parent.left

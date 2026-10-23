@@ -22,6 +22,9 @@ Item {
 
   readonly property var latest: samples.length ? samples[samples.length - 1] : null
   readonly property bool onBattery: latest !== null && typeof latest.drawW === "number"
+  // Discharging per the sample status (or no AC), even when the draw could not be read.
+  readonly property bool dischargingNow: latest !== null && (latest.status === "Discharging" || latest.ac === false)
+  readonly property bool drawMissing: dischargingNow && !onBattery
   readonly property var result: Model.powerRows(Model.appShares(samples), latest, 3)
   readonly property bool showSpark: onBattery && result.mode !== "cpu" && drawBuffer.length >= 2
 
@@ -101,8 +104,8 @@ Item {
         anchors.left: parent.left
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
-        text: root.latest === null ? "Draw now" : (root.onBattery ? "Draw now" : "Plugged in")
-        color: root.onBattery || root.latest === null ? root.cText : root.cMuted
+        text: root.latest === null ? "Draw now" : (root.dischargingNow ? "Draw now" : "Plugged in")
+        color: root.dischargingNow || root.latest === null ? root.cText : root.cMuted
         font.family: root.fontFamily
         font.pixelSize: Style.font.bodySmall
       }
@@ -111,7 +114,7 @@ Item {
         anchors.right: parent.right
         anchors.verticalCenter: parent.verticalCenter
         textFormat: Text.PlainText
-        text: root.onBattery ? Number(root.latest.drawW).toFixed(1) + " W" : (root.latest === null ? "measuring…" : "")
+        text: root.onBattery ? Number(root.latest.drawW).toFixed(1) + " W" : (root.latest === null ? "measuring…" : (root.drawMissing ? "—" : ""))
         color: root.onBattery ? root.cPower : root.cMuted
         font.family: root.fontFamily
         font.pixelSize: Style.font.bodySmall
@@ -248,7 +251,7 @@ Item {
       wrapMode: Text.WordWrap
       textFormat: Text.PlainText
       text: root.result.mode === "watts" ? "Estimated from CPU share of the measured draw"
-        : "Plugged in · watts shown on battery"
+        : (root.drawMissing ? "Draw unavailable · showing CPU share" : "Plugged in · watts shown on battery")
       color: root.cMuted
       font.family: root.fontFamily
       font.pixelSize: Style.font.caption

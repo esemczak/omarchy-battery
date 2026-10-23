@@ -455,7 +455,12 @@ function parseThemeColors(text) {
   var lines = String(text || "").split("\n")
   for (var i = 0; i < lines.length; i++) {
     var m = /^\s*([A-Za-z0-9_]+)\s*=\s*"(#(?:[0-9a-fA-F]{8}|[0-9a-fA-F]{6}|[0-9a-fA-F]{3}))"\s*(?:#.*)?$/.exec(lines[i])
-    if (m) out[m[1].toLowerCase()] = m[2]
+    if (m) {
+      var v = m[2]
+      // TOML 8-digit hex is #rrggbbaa; QML reads 8 digits as #aarrggbb.
+      if (v.length === 9) v = "#" + v.slice(7, 9) + v.slice(1, 7)
+      out[m[1].toLowerCase()] = v
+    }
   }
   return out
 }
@@ -464,10 +469,10 @@ function semanticColors(palette, fallback) {
   var p = palette || {}
   var f = fallback || {}
   return {
-    good: p.green || f.accent,
-    warn: p.red || f.urgent,
+    good: p.green || p.color2 || f.accent,
+    warn: p.red || p.color1 || f.urgent,
     neutral: p.accent || f.accent,
-    power: p.cyan || p.blue || f.accent,
+    power: p.cyan || p.color6 || p.blue || f.accent,
     text: p.foreground || f.foreground,
     muted: p.muted || f.muted
   }

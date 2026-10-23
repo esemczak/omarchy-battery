@@ -371,7 +371,22 @@ test("parseThemeColors reads hex colours from colors.toml", () => {
 test("parseThemeColors ignores comments and junk, handles hex lengths", () => {
   assert.deepEqual(Model.parseThemeColors(""), {})
   const p = Model.parseThemeColors('# green = "#111111"\nJunk line\nRED = "#abc"\nx = #123456\nblue = "#11223344"\nmode = "dark"\nbad = "#12345"\n')
-  assert.deepEqual(p, { red: "#abc", blue: "#11223344" })
+  assert.deepEqual(p, { red: "#abc", blue: "#44112233" })
+})
+
+test("parseThemeColors rewrites 8-digit #rrggbbaa to QML #aarrggbb", () => {
+  assert.equal(Model.parseThemeColors('bg = "#1e1e2eff"\n').bg, "#ff1e1e2e")
+  assert.equal(Model.parseThemeColors('bg = "#11223380"\n').bg, "#80112233")
+})
+
+test("semanticColors falls back to ANSI color slots", () => {
+  const fb = { accent: "#aaaaaa", urgent: "#bb0000", foreground: "#ffffff", muted: "#777777" }
+  const s = Model.semanticColors({ color1: "#c1", color2: "#c2", color6: "#c6", color4: "#c4" }, fb)
+  assert.equal(s.warn, "#c1")
+  assert.equal(s.good, "#c2")
+  assert.equal(s.power, "#c6")
+  assert.equal(Model.semanticColors({ red: "#r", green: "#g", cyan: "#c", color1: "#c1", color2: "#c2", color6: "#c6" }, fb).good, "#g")
+  assert.equal(Model.semanticColors({ blue: "#05", color6: "#c6" }, fb).power, "#c6")
 })
 
 test("semanticColors maps palette with fallbacks", () => {
