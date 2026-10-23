@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "esemczak.battery",
   "name": "Battery",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": "esemczak",
   "license": "MIT",
   "description": "Battery bar widget with charging controls, health history and alerts. Replaces omarchy.power.",

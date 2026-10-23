@@ -10,17 +10,23 @@ parts sit in the same panel below it.
 
 ## Features
 
-- **Charging controls** — pick a charge mode and, in Custom mode, set the
-  start and end charge thresholds with sliders (for example 50 to 90%). Shown
+- **Charging controls** — pick a charge mode from a row of tiles. A battery
+  gauge shows the charge level and the start and end limits; in Custom mode
+  drag the two handles to set them (for example 50 to 90%). The gauge is
+  read-only in other modes, and the mouse wheel never changes the limits. Shown
   only when the hardware exposes `charge_types` and/or the
   `charge_control_*_threshold` files.
+- **Power use** — what is drawing power right now: the battery's draw in
+  watts, a short sparkline of it, and the top 3 apps. See
+  [Power use](#power-use-is-an-estimate).
 - **Health history** — a sample is stored on service start, every 6 hours, and
   when AC is plugged or unplugged (a sample is skipped if the last one is under
   6 hours old, except on plug/unplug). History is append-only and never pruned.
   The first run also writes a synthetic 100% point at the battery's
   manufacture date, when the firmware reports one.
 - **Health graph** — line chart of health over 3 months, 1 year, or all time
-  (click to cycle), with a dashed health-floor line and a marker for the end of
+  (click to cycle; it opens on all time until there are 30 days of history),
+  with a dashed health-floor line and a marker for the end of
   your warranty.
 - **Wear projection** — health, wear in % per month, and the month in which
   health is projected to reach the floor. Uses a fit over the last 90 days once
@@ -35,7 +41,24 @@ parts sit in the same panel below it.
   - *Battery wearing fast*: health is projected to reach the floor before the
     warranty ends. Notified at most once a week, and only from a fitted rate,
     not an estimate.
+- **Theme colours** — the panel takes its colours from the current Omarchy
+  theme and follows it when you switch themes.
 - Bar glyph, optional percentage, power profiles, and IPC as in the stock widget.
+
+## Power use is an estimate
+
+The POWER USE section lists the 3 apps using the most CPU. On battery, each
+app's figure is its share of CPU time over the last ~10 seconds multiplied by
+the battery's measured draw, shown as `~1.2 W`. The draw is measured; the
+split between apps is an estimate, because CPU time is not the same as power
+(screen, GPU and radios are not attributed).
+
+On the charger the draw cannot be measured, so the section shows each app's
+percentage of CPU instead, with no watts or sparkline.
+
+"Desktop" is Hyprland and the shell, which includes the panel's own sampling.
+The section reads cgroup CPU counters every 2 seconds, and only while the
+panel is open; nothing is sampled when it is closed.
 
 ## Requirements
 
