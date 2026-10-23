@@ -1,0 +1,96 @@
+<style>
+  :root{--bg:#0c0b0c;--fg:#FAFCFB;--dim:#cfd3cd;--mut:#584e51;--acc:#b59790;--red:#c38b7b;--grn:#87a9b0;--cyn:#a5a0b6;--mag:#c4d8e2;--yel:#6B5E73}
+  .p{background:var(--bg);color:var(--fg);font-family:"JetBrainsMono Nerd Font",monospace;border:1px solid var(--mut);border-radius:8px;padding:16px;width:380px;font-size:12px;line-height:1.45;margin:0 auto}
+  .dim{color:var(--dim);opacity:.6}.row{display:flex;justify-content:space-between;align-items:center}
+  .sec{font-size:10px;letter-spacing:1.2px;font-weight:700;opacity:.6;margin:16px 0 8px;padding-top:12px;border-top:1px solid #1f1b1c}
+  .hero{display:flex;align-items:center;gap:12px}.hero .big{margin-left:auto;font-size:32px;font-weight:700;background:linear-gradient(90deg,var(--fg),var(--grn));-webkit-background-clip:text;color:transparent}
+  .cbar{height:7px;border-radius:4px;background:#1f1b1c;margin:12px 0;overflow:hidden;position:relative}
+  .cbar i{position:absolute;left:0;top:0;bottom:0;width:80%;border-radius:4px;background:linear-gradient(90deg,var(--red) 0%,var(--acc) 35%,var(--grn) 100%)}
+  .banner{display:flex;gap:10px;align-items:center;border-left:3px solid var(--red);background:#c38b7b14;border-radius:4px;padding:8px 10px;margin-top:10px;animation:in .5s ease-out both}
+  .banner b{color:var(--red)}.fix{margin-left:auto;border:1px solid var(--red);color:var(--red);border-radius:4px;padding:3px 10px;animation:nudge 3s ease-in-out infinite}
+  @keyframes in{from{opacity:0;transform:translateY(-6px)}}
+  @keyframes nudge{50%{background:#c38b7b22}}
+  .grid{display:grid;grid-template-columns:repeat(5,1fr);gap:5px}
+  .t{border:1px solid #2a2526;border-radius:6px;padding:6px 2px;text-align:center;font-size:10px;color:var(--dim)}
+  .t .i{font-size:15px;display:block}
+  .t.fast{border-color:#c38b7b55;color:var(--red)}
+  .t.on{border-color:var(--grn);color:var(--fg);background:#87a9b014;animation:glow 3s ease-in-out infinite}
+  @keyframes glow{50%{box-shadow:0 0 10px #87a9b044,0 0 0 1px #87a9b088 inset}}
+  .batt{position:relative;margin:18px 4px 18px 0;height:30px;border:2px solid var(--mut);border-radius:6px}
+  .batt:after{content:"";position:absolute;right:-6px;top:8px;width:4px;height:10px;background:var(--mut);border-radius:0 2px 2px 0}
+  .batt .safe{position:absolute;top:2px;bottom:2px;left:50%;width:40%;background:#87a9b012}
+  .batt .fill{position:absolute;left:2px;top:2px;bottom:2px;width:calc(80% - 4px);background:linear-gradient(90deg,#87a9b033,#87a9b077);border-radius:3px;overflow:hidden}
+  .batt .fill:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,#ffffff18,transparent);animation:sh 3.5s linear infinite}
+  @keyframes sh{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+  .batt .h{position:absolute;top:-6px;bottom:-6px;width:3px;margin-left:-1px;background:var(--acc);border-radius:2px}
+  .batt .n{position:absolute;bottom:-18px;font-size:10px;color:var(--acc);transform:translateX(-50%)}
+  .hrow{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+  .stat{background:#151213;border-radius:6px;padding:7px 8px}.stat .v{font-size:15px;font-weight:700}.stat .l{font-size:9.5px;opacity:.6;letter-spacing:.6px}
+  .ring{width:44px;height:44px}
+  .bar{height:4px;background:#1f1b1c;border-radius:2px;margin:3px 0 7px;overflow:hidden}.bar i{display:block;height:100%;border-radius:2px;animation:grow 1s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes grow{from{width:0}}
+  .prof{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}.prof span{border:1px solid #2a2526;border-radius:5px;text-align:center;padding:6px 0;font-size:11px;color:var(--dim)}
+  .prof span.on{border-color:var(--acc);color:var(--fg);background:#b5979018}
+  svg{display:block;width:100%}
+</style>
+
+<h2>Whole panel, option B carried through</h2>
+<p class="subtitle">Every colour comes from the active theme. Motion is shown a little stronger than it would really be. Tell me what to change.</p>
+
+<div class="p">
+  <div class="hero"><span style="font-size:28px;color:var(--grn)">󰁹</span><div><b style="font-size:14px">Battery</b><br><span class="dim" style="font-size:10px;letter-spacing:1.2px">SIPPING JUICE</span></div><span class="big">80%</span></div>
+  <div class="cbar"><i></i></div>
+  <div class="row dim" style="font-size:11px"><span>62 Wh · 65 cycles</span><span>8h 35m left · 6.5 W</span></div>
+
+  <div class="banner"><span style="color:var(--red)">󰀦</span><span>Limit 50–90% set, but mode is <b>Fast</b>, so it's ignored.</span><span class="fix">Fix</span></div>
+
+  <div class="sec">CHARGING</div>
+  <div class="grid">
+    <div class="t"><span class="i">󰂃</span>Trickle</div>
+    <div class="t fast"><span class="i">󱐋</span>Fast</div>
+    <div class="t"><span class="i">󰁹</span>Standard</div>
+    <div class="t"><span class="i">󰂏</span>Adaptive</div>
+    <div class="t on"><span class="i">󰢝</span>Custom</div>
+  </div>
+  <div class="batt"><div class="safe"></div><div class="fill"></div>
+    <div class="h" style="left:50%"></div><div class="h" style="left:90%"></div>
+    <div class="n" style="left:50%">50%</div><div class="n" style="left:90%">90%</div></div>
+
+  <div class="sec">HEALTH</div>
+  <div class="hrow">
+    <div class="stat"><div class="v" style="color:var(--acc)">90.3%</div><div class="l">HEALTH</div></div>
+    <div class="stat"><div class="v">−1.0<span style="font-size:10px">%/mo</span></div><div class="l">WEAR · EST.</div></div>
+    <div class="stat"><div class="v" style="color:var(--grn)">Sep 27</div><div class="l">REACHES 80%</div></div>
+  </div>
+  <svg viewBox="0 0 340 70"><defs><linearGradient id="g" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#b59790" stop-opacity=".35"/><stop offset="1" stop-color="#b59790" stop-opacity="0"/></linearGradient></defs>
+    <path d="M0,6 L190,22 L190,70 L0,70 Z" fill="url(#g)"/><polyline points="0,6 190,22" fill="none" stroke="#b59790" stroke-width="2"/>
+    <polyline points="190,22 340,34" fill="none" stroke="#b59790" stroke-width="1.5" stroke-dasharray="3 3" opacity=".5"/>
+    <circle cx="0" cy="6" r="3" fill="none" stroke="#b59790"/><circle cx="190" cy="22" r="3.5" fill="#b59790"><animate attributeName="r" values="3.5;5;3.5" dur="2.4s" repeatCount="indefinite"/></circle>
+    <line x1="0" x2="340" y1="52" y2="52" stroke="#c38b7b" stroke-dasharray="4 4" opacity=".7"/><text x="4" y="64" font-size="9" fill="#c38b7b">80%</text>
+    <line x1="300" x2="300" y1="0" y2="70" stroke="#584e51" stroke-dasharray="2 3"/><text x="262" y="10" font-size="9" fill="#cfd3cd" opacity=".6">warranty</text></svg>
+  <div class="row dim" style="font-size:10px"><span>65 cycles · 33.6 °C</span><span>all time ▸</span></div>
+
+  <div class="sec">POWER USE</div>
+  <div class="row"><span>Draw now</span><b style="color:var(--cyn)">6.5 W</b></div>
+  <svg viewBox="0 0 300 26" preserveAspectRatio="none" style="height:26px"><polyline fill="none" stroke="#a5a0b6" stroke-width="1.5" points="0,18 20,16 40,20 60,12 80,14 100,9 120,15 140,17 160,11 180,13 200,8 220,14 240,16 260,12 280,15 300,13"/></svg>
+  <div class="row" style="margin-top:6px"><span>Brave</span><span class="dim">~2.1 W</span></div><div class="bar"><i style="width:62%;background:var(--red)"></i></div>
+  <div class="row"><span>Code</span><span class="dim">~0.9 W</span></div><div class="bar"><i style="width:27%;background:var(--acc);animation-delay:.1s"></i></div>
+  <div class="row"><span>Zen</span><span class="dim">~0.6 W</span></div><div class="bar"><i style="width:18%;background:var(--cyn);animation-delay:.2s"></i></div>
+  <div class="dim" style="font-size:9.5px">Estimated from CPU share of the measured draw</div>
+
+  <div class="sec">POWER PROFILE</div>
+  <div class="prof"><span>󰌪 Saver</span><span class="on">󰊚 Balanced</span><span>󰓅 Performance</span></div>
+</div>
+
+<div style="margin-top:22px">
+<h3>Motion list (subtle in reality)</h3>
+<ul>
+<li>Panel opens: sections fade and slide up 4px one after another (40 ms stagger)</li>
+<li>Big %: counts up to the value; charge bar grows from 0</li>
+<li>Banner slides in, and the Fix button gently pulses once every few seconds</li>
+<li>Active mode tile: slow breathing glow; switching cross-fades</li>
+<li>Gauge fill: shimmer only while charging; limit handles lift slightly on hover</li>
+<li>Health chart: line draws itself on open; today's point pulses softly; projection dashed toward the 80% line</li>
+<li>Power bars: grow in, then re-rank with a smooth reorder when values change</li>
+</ul>
+</div>

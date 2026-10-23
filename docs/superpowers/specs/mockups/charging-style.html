@@ -1,0 +1,88 @@
+<style>
+  :root{--bg:#0c0b0c;--fg:#FAFCFB;--dim:#cfd3cd;--mut:#584e51;--acc:#b59790;--red:#c38b7b;--grn:#87a9b0;--cyn:#a5a0b6;--mag:#c4d8e2}
+  .p{background:var(--bg);color:var(--fg);font-family:"JetBrainsMono Nerd Font",monospace;border:1px solid var(--mut);border-radius:6px;padding:14px;width:340px;font-size:12px;line-height:1.45}
+  .p .dim{color:var(--dim);opacity:.6}.p .row{display:flex;justify-content:space-between;align-items:center}
+  .sec{font-size:10px;letter-spacing:1.2px;font-weight:700;opacity:.6;margin:2px 0 8px}
+  /* A: segmented + range band */
+  .seg{position:relative;display:flex;background:#1a1718;border-radius:6px;padding:3px}
+  .seg span{flex:1;text-align:center;padding:5px 0;font-size:11px;position:relative;z-index:1;color:var(--dim)}
+  .seg span.on{color:var(--bg);font-weight:700}
+  .seg .pill{position:absolute;top:3px;bottom:3px;width:calc((100% - 6px)/5);left:calc(3px + 4*(100% - 6px)/5);background:var(--grn);border-radius:4px;animation:slide 3s ease-in-out infinite alternate}
+  @keyframes slide{0%{left:3px;background:var(--red)}100%{left:calc(3px + 4*(100% - 6px)/5);background:var(--grn)}}
+  .hint{margin:6px 0 10px;font-size:10.5px;color:var(--dim);opacity:.75}
+  .band{position:relative;height:16px;margin:16px 0 4px}
+  .band .track{position:absolute;inset:6px 0;background:#1f1b1c;border-radius:3px}
+  .band .safe{position:absolute;top:6px;bottom:6px;left:50%;width:40%;background:linear-gradient(90deg,#87a9b055,#87a9b0aa);border-radius:3px}
+  .band .now{position:absolute;top:2px;bottom:2px;left:80%;width:2px;background:var(--fg);box-shadow:0 0 6px var(--fg);animation:breathe 2.4s ease-in-out infinite}
+  .band .k{position:absolute;top:0;width:14px;height:14px;margin-left:-7px;border-radius:50%;background:var(--bg);border:2px solid var(--grn)}
+  .band .lbl{position:absolute;top:-14px;font-size:10px;transform:translateX(-50%);color:var(--grn)}
+  @keyframes breathe{50%{opacity:.35}}
+  /* B: cards */
+  .cards{display:grid;grid-template-columns:repeat(3,1fr);gap:6px}
+  .card2{border:1px solid #2a2526;border-radius:6px;padding:7px 6px;text-align:center;font-size:10.5px;color:var(--dim);transition:all .2s}
+  .card2 .i{font-size:16px;display:block;margin-bottom:2px}
+  .card2.on{border-color:var(--grn);color:var(--fg);background:#87a9b014;box-shadow:0 0 0 1px #87a9b066 inset;animation:glow 2.6s ease-in-out infinite}
+  @keyframes glow{50%{box-shadow:0 0 10px #87a9b055,0 0 0 1px #87a9b0aa inset}}
+  .batt{position:relative;margin:14px 0 4px;height:34px;border:2px solid var(--mut);border-radius:6px}
+  .batt:after{content:"";position:absolute;right:-6px;top:10px;width:4px;height:10px;background:var(--mut);border-radius:0 2px 2px 0}
+  .batt .fill{position:absolute;left:2px;top:2px;bottom:2px;width:calc(80% - 4px);background:linear-gradient(90deg,#87a9b033,#87a9b088);border-radius:3px;overflow:hidden}
+  .batt .fill:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,#ffffff22,transparent);animation:shimmer 2.8s linear infinite}
+  @keyframes shimmer{from{transform:translateX(-100%)}to{transform:translateX(100%)}}
+  .batt .lim{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--acc)}
+  .batt .t{position:absolute;bottom:-17px;font-size:10px;color:var(--acc);transform:translateX(-50%)}
+  /* power section */
+  .pw .bar{height:4px;background:#1f1b1c;border-radius:2px;margin:3px 0 7px;overflow:hidden}
+  .pw .bar i{display:block;height:100%;border-radius:2px;animation:grow 1.2s cubic-bezier(.2,.8,.2,1) both}
+  @keyframes grow{from{width:0}}
+  .spark{display:block;width:100%;height:28px}
+</style>
+
+<h2>How should the Charging section feel?</h2>
+<p class="subtitle">Real theme colours (your current palette). The animations in these mockups are exaggerated so you can see them. In the panel they'd be subtle and only run while it's open. Click one, or mix and match.</p>
+
+<div class="cards">
+
+<div class="card" data-choice="a" onclick="toggleSelect(this)">
+<div class="card-image"><div class="p">
+  <div class="sec">CHARGING</div>
+  <div class="seg"><div class="pill"></div><span>Trickle</span><span>Fast</span><span>Std</span><span>Adapt</span><span class="on">Custom</span></div>
+  <div class="hint">Custom: holds the battery between your limits. Best for always-plugged-in.</div>
+  <div class="band"><div class="track"></div><div class="safe"></div><div class="now"></div>
+    <div class="k" style="left:50%"></div><div class="k" style="left:90%"></div>
+    <div class="lbl" style="left:50%">50%</div><div class="lbl" style="left:90%">90%</div></div>
+  <div class="row dim" style="font-size:10px"><span>0</span><span>now 80% ▲</span><span>100</span></div>
+</div></div>
+<div class="card-body"><h3>A. Segmented switch + one range bar</h3><p>A sliding pill picks the mode and changes colour: amber for Fast, sage for Custom. Both limits sit on ONE bar with two handles, with the "safe band" shaded and a breathing marker at the current charge.</p></div>
+</div>
+
+<div class="card" data-choice="b" onclick="toggleSelect(this)">
+<div class="card-image"><div class="p">
+  <div class="sec">CHARGING</div>
+  <div class="cards" style="display:grid">
+    <div class="card2"><span class="i">󰂃</span>Trickle</div>
+    <div class="card2"><span class="i">󱐋</span>Fast</div>
+    <div class="card2"><span class="i">󰁹</span>Standard</div>
+    <div class="card2"><span class="i">󰂏</span>Adaptive</div>
+    <div class="card2 on"><span class="i">󰢝</span>Custom</div>
+    <div class="card2" style="opacity:0"></div>
+  </div>
+  <div class="batt"><div class="fill"></div>
+    <div class="lim" style="left:50%"></div><div class="lim" style="left:90%"></div>
+    <div class="t" style="left:50%">50</div><div class="t" style="left:90%">90</div></div>
+  <div style="height:12px"></div>
+</div></div>
+<div class="card-body"><h3>B. Mode tiles + battery gauge</h3><p>Icon tiles, with the active one softly glowing. The limits are drawn as marks on a battery-shaped gauge, and the fill shimmers while charging. More visual, but taller.</p></div>
+</div>
+
+</div>
+
+<h3 style="margin-top:28px">Plus: the new power-usage section (same in both)</h3>
+<div class="p pw">
+  <div class="sec">POWER USE</div>
+  <div class="row"><span>Draw now</span><b>6.5 W</b></div>
+  <svg class="spark" viewBox="0 0 300 28" preserveAspectRatio="none"><polyline fill="none" stroke="#a5a0b6" stroke-width="1.5" points="0,18 20,16 40,20 60,12 80,14 100,9 120,15 140,17 160,11 180,13 200,8 220,14 240,16 260,12 280,15 300,13"/></svg>
+  <div class="row" style="margin-top:6px"><span>Brave</span><span class="dim">~2.1 W</span></div><div class="bar"><i style="width:62%;background:var(--red)"></i></div>
+  <div class="row"><span>Code</span><span class="dim">~0.9 W</span></div><div class="bar"><i style="width:27%;background:var(--acc)"></i></div>
+  <div class="row"><span>Zen</span><span class="dim">~0.6 W</span></div><div class="bar"><i style="width:18%;background:var(--cyn)"></i></div>
+  <div class="dim" style="font-size:10px;margin-top:2px">Estimated from CPU share of the measured draw, last 5 min</div>
+</div>
