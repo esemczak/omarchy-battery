@@ -783,6 +783,30 @@ Panel {
           }
         }
 
+        // ---------- Power use ----------
+        PanelSeparator {
+          foreground: root.bar.foreground
+        }
+
+        Column {
+          width: parent.width
+          spacing: Style.space(10)
+
+          PanelSectionHeader {
+            text: "POWER USE"
+            foreground: root.bar.foreground
+            fontFamily: root.bar.fontFamily
+          }
+
+          PowerUse {
+            width: parent.width
+            opened: root.opened && root.batteryPresent
+            palette: themePalette
+            pluginDir: root.pluginDir
+            fontFamily: root.bar.fontFamily
+          }
+        }
+
         // ---------- Power profile picker ----------
         PanelSeparator {
           foreground: root.bar.foreground
