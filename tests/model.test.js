@@ -442,3 +442,29 @@ test("appendDrawPoint gaps, expiry and cap", () => {
   assert.equal(big.length, 150)
   assert.equal(big[149].t, 1000000 + 199 * 1000)
 })
+
+test("modeTone maps modes to semantic tones", () => {
+  assert.equal(Model.modeTone("Custom"), "good")
+  assert.equal(Model.modeTone("Fast"), "warn")
+  assert.equal(Model.modeTone("Standard"), "neutral")
+  assert.equal(Model.modeTone("Trickle"), "neutral")
+  assert.equal(Model.modeTone(undefined), "neutral")
+})
+
+test("modeIcon maps modes to glyphs", () => {
+  assert.equal(Model.modeIcon("Trickle"), "󰂃")
+  assert.equal(Model.modeIcon("Fast"), "󱐋")
+  assert.equal(Model.modeIcon("Standard"), "󰁹")
+  assert.equal(Model.modeIcon("Adaptive"), "󰂏")
+  assert.equal(Model.modeIcon("Custom"), "󰢝")
+  assert.equal(Model.modeIcon("Other"), "󰂄")
+})
+
+test("clampHandle keeps 1 <= start < end <= 100", () => {
+  assert.equal(Model.clampHandle("start", 95, 50, 90), 89)
+  assert.equal(Model.clampHandle("end", 40, 50, 90), 51)
+  assert.equal(Model.clampHandle("end", 120, 50, 90), 100)
+  assert.equal(Model.clampHandle("start", 0, 50, 90), 1)
+  assert.equal(Model.clampHandle("start", 60.6, 50, 90), 61)
+  assert.equal(Model.clampHandle("end", 70.2, 50, 90), 70)
+})

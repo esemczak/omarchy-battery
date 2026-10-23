@@ -23,6 +23,8 @@ Panel {
   // null until the first `test -x` finishes; false shows the install hint.
   property var helperPresent: null
   property string actionMessage: ""
+  // Last non-empty message, so the feedback line can fade out with its text.
+  property string shownMessage: ""
   property var pendingArgs: []
 
   readonly property string pluginDir: {
@@ -68,6 +70,7 @@ Panel {
 
   function showMessage(text) {
     actionMessage = text
+    if (text !== "") shownMessage = text
     messageTimer.restart()
   }
 
@@ -263,6 +266,7 @@ Panel {
         return
       }
 
+      themePalette.reload()
       refresh()
       var idx = profiles.indexOf(activeProfile)
       profileIndex = idx >= 0 ? idx : 0
@@ -271,6 +275,8 @@ Panel {
   }
 
   onBatteryPresentChanged: if (!batteryPresent) close()
+
+  ThemePalette { id: themePalette }
 
   visible: batteryPresent
   implicitWidth: batteryPresent ? button.implicitWidth : 0
@@ -347,6 +353,7 @@ Panel {
       var result = Model.actionResult(code)
       root.showMessage(result.message)
       var args = root.pendingArgs
+      if (!result.ok) gauge.resync()
       if (result.ok && args.length === 2 && args[0] === "mode") {
         recordProc.command = ["bash", root.pluginDir + "/bin/state-update.sh", root.stateDirPath,
           JSON.stringify({ chosenMode: String(args[1]) })]
@@ -676,15 +683,16 @@ Panel {
           }
 
           Text {
-            visible: root.helperPresent === false
+            visible: opacity > 0
+            opacity: root.helperPresent === false ? 1 : 0
             width: parent.width
             textFormat: Text.PlainText
             text: "Install the battery helper: run install-helper.sh in the plugin repo"
             wrapMode: Text.WordWrap
-            color: root.bar.foreground
-            opacity: 0.6
+            color: themePalette.muted
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.bodySmall
+            Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
           }
 
           Column {
@@ -692,103 +700,44 @@ Panel {
             width: parent.width
             spacing: Style.space(10)
 
-            Flow {
+            ModeTiles {
               visible: root.hasModes
               width: parent.width
-              spacing: Style.space(6)
-
-              Repeater {
-                model: root.snapshot ? root.snapshot.modes : []
-                Button {
-                  required property var modelData
-                  text: String(modelData)
-                  fontSize: Style.font.bodySmall
-                  foreground: root.bar.foreground
-                  fontFamily: root.bar.fontFamily
-                  horizontalPadding: Style.spacing.controlPaddingX
-                  verticalPadding: Style.spacing.controlPaddingY
-                  bordered: true
-                  active: root.snapshot && root.snapshot.mode === modelData
-                  onClicked: if (!(root.snapshot && root.snapshot.mode === modelData)) root.runHelper(["mode", String(modelData)])
-                }
-              }
+              modes: root.snapshot ? root.snapshot.modes : []
+              activeMode: root.snapshot && root.snapshot.mode ? root.snapshot.mode : ""
+              palette: themePalette
+              opened: root.opened
+              enabled: !helperProc.running
+              fontFamily: root.bar.fontFamily
+              onPicked: function(mode) { root.runHelper(["mode", mode]) }
             }
 
-            Column {
+            BatteryGauge {
+              id: gauge
               visible: root.hasLimits
               width: parent.width
-              spacing: Style.space(4)
-              opacity: root.limitsEditable ? 1.0 : 0.4
-              enabled: root.limitsEditable && !helperProc.running
-
-              Row {
-                width: parent.width
-                spacing: Style.space(10)
-                InfoLabel { text: "Start"; width: Style.space(40); anchors.verticalCenter: parent.verticalCenter }
-                PanelSlider {
-                  id: startSlider
-                  bar: root.bar
-                  width: parent.width - Style.space(40) - Style.space(44) - parent.spacing * 2
-                  anchors.verticalCenter: parent.verticalCenter
-                  integer: true
-                  step: 1
-                  minimum: 1
-                  maximum: 99
-                  value: root.snapshot && root.snapshot.start !== null ? root.snapshot.start : 1
-                  onReleased: function(v) {
-                    var end = root.snapshot.end
-                    if (v !== root.snapshot.start) root.commitLimits(Math.min(v, end - 1), end)
-                  }
-
-                  // Stock PanelSlider commits (released) on every wheel tick; swallow the wheel.
-                  MouseArea {
-                    anchors.fill: parent
-                    acceptedButtons: Qt.NoButton
-                    onWheel: function(wheel) { wheel.accepted = true }
-                  }
-                }
-                InfoValue { text: Math.round(startSlider.liveValue) + "%"; width: Style.space(44); horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter }
-              }
-
-              Row {
-                width: parent.width
-                spacing: Style.space(10)
-                InfoLabel { text: "End"; width: Style.space(40); anchors.verticalCenter: parent.verticalCenter }
-                PanelSlider {
-                  id: endSlider
-                  bar: root.bar
-                  width: parent.width - Style.space(40) - Style.space(44) - parent.spacing * 2
-                  anchors.verticalCenter: parent.verticalCenter
-                  integer: true
-                  step: 1
-                  minimum: 2
-                  maximum: 100
-                  value: root.snapshot && root.snapshot.end !== null ? root.snapshot.end : 100
-                  onReleased: function(v) {
-                    var start = root.snapshot.start
-                    if (v !== root.snapshot.end) root.commitLimits(start, Math.max(v, start + 1))
-                  }
-
-                  // Stock PanelSlider commits (released) on every wheel tick; swallow the wheel.
-                  MouseArea {
-                    anchors.fill: parent
-                    acceptedButtons: Qt.NoButton
-                    onWheel: function(wheel) { wheel.accepted = true }
-                  }
-                }
-                InfoValue { text: Math.round(endSlider.liveValue) + "%"; width: Style.space(44); horizontalAlignment: Text.AlignRight; anchors.verticalCenter: parent.verticalCenter }
-              }
-            }
-
-            InfoLabel {
-              visible: root.hasLimits && !root.limitsEditable
-              text: "Applies in Custom mode"
+              percent: Math.round(root.batteryFraction * 100)
+              start: root.snapshot && root.snapshot.start !== null ? root.snapshot.start : 1
+              end: root.snapshot && root.snapshot.end !== null ? root.snapshot.end : 100
+              charging: root.charging
+              editable: root.limitsEditable
+              busy: helperProc.running
+              palette: themePalette
+              opened: root.opened
+              fontFamily: root.bar.fontFamily
+              onCommitted: function(s, e) { root.commitLimits(s, e) }
             }
           }
 
-          InfoLabel {
-            visible: root.actionMessage !== ""
-            text: root.actionMessage
+          Text {
+            visible: opacity > 0
+            opacity: root.actionMessage !== "" ? 1 : 0
+            textFormat: Text.PlainText
+            text: root.shownMessage
+            color: themePalette.muted
+            font.family: root.bar.fontFamily
+            font.pixelSize: Style.font.bodySmall
+            Behavior on opacity { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
           }
         }
 

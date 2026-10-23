@@ -511,6 +511,26 @@ function appendDrawPoint(buffer, sample, nowMs) {
   return out.length > 150 ? out.slice(out.length - 150) : out
 }
 
+// --- Charging controls (mode tiles + gauge) ---
+
+function modeTone(mode) {
+  if (mode === "Custom") return "good"
+  if (mode === "Fast") return "warn"
+  return "neutral"
+}
+
+function modeIcon(mode) {
+  var icons = { Trickle: "󰂃", Fast: "󱐋", Standard: "󰁹", Adaptive: "󰂏", Custom: "󰢝" }
+  return Object.prototype.hasOwnProperty.call(icons, mode) ? icons[mode] : "󰂄"
+}
+
+// Helper rules: 1 <= start < end <= 100; a handle stops 1 short of the other.
+function clampHandle(which, value, start, end) {
+  var v = Math.round(Number(value))
+  if (which === "start") return Math.max(1, Math.min(end - 1, v))
+  return Math.max(start + 1, Math.min(100, v))
+}
+
 if (typeof module !== "undefined" && module.exports) {
   module.exports = {
     PLUGIN_ID: PLUGIN_ID, stateDir: stateDir,
@@ -526,6 +546,7 @@ if (typeof module !== "undefined" && module.exports) {
     parseThemeColors: parseThemeColors, semanticColors: semanticColors,
     settingsFrom: settingsFrom, settingsFromShellConfig: settingsFromShellConfig, evaluateAlerts: evaluateAlerts, limitModeIgnored: limitModeIgnored,
     parsePowerSample: parsePowerSample, unitLabel: unitLabel, appShares: appShares,
-    powerRows: powerRows, appendDrawPoint: appendDrawPoint
+    powerRows: powerRows, appendDrawPoint: appendDrawPoint,
+    modeTone: modeTone, modeIcon: modeIcon, clampHandle: clampHandle
   }
 }

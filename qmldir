@@ -1,3 +1,5 @@
 Service 1.0 Service.qml
 HealthChart 1.0 HealthChart.qml
 ThemePalette 1.0 ThemePalette.qml
+ModeTiles 1.0 ModeTiles.qml
+BatteryGauge 1.0 BatteryGauge.qml
