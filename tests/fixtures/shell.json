@@ -1,0 +1,22 @@
+{
+  "bar": {
+    "layout": {
+      "left": [
+        { "id": "omarchy.menu" },
+        { "id": "omarchy.workspaces" }
+      ],
+      "center": [
+        { "id": "omarchy.clock" }
+      ],
+      "right": [
+        { "id": "omarchy.tray" },
+        { "id": "omarchy.network" },
+        { "id": "omarchy.audio" },
+        { "id": "esemczak.battery", "showPercentage": true }
+      ]
+    },
+    "position": "top"
+  },
+  "plugins": [],
+  "version": 1
+}

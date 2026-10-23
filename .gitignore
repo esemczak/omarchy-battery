@@ -1,0 +1,10 @@
+.superpowers/
+.remember/
+/tmp
+node_modules/
+*.swp
+*~
+.DS_Store
+.idea/
+.vscode/
+*.swo
