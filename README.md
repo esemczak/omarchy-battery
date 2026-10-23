@@ -51,7 +51,7 @@ parts sit in the same panel below it.
 When published:
 
 ```bash
-omarchy plugin add <git-url> --enable --yes
+omarchy plugin add https://github.com/esemczak/omarchy-battery.git --enable --yes
 omarchy restart shell
 ```
 
