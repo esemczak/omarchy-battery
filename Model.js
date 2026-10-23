@@ -255,7 +255,38 @@ function chartPoints(samples, rangeKey, now, opts) {
     points: visible.map(function (s) { return { x: xOf(s.t), y: yOf(s.health), seed: s.seed === true } }),
     yMin: yMin, yMax: yMax,
     floorY: floor >= yMin && floor <= yMax ? yOf(floor) : null,
-    warrantyX: warrantyX
+    warrantyX: warrantyX,
+    start: start, end: end
+  }
+}
+
+// End of the dashed projection: a straight line from the latest point at
+// `rate` (health %/month) to the floor crossing or the domain end, whichever
+// comes first, in chartPoints' 0..1 coordinates. Null when health isn't falling.
+function projectionPoint(chart, rate, floor, now, rangeKey) {
+  if (typeof rate !== "number" || !isFinite(rate) || rate >= 0) return null
+  var pts = chart && chart.points ? chart.points : []
+  if (pts.length === 0) return null
+  var start = chart.start, end = chart.end
+  if (typeof start !== "number" || typeof end !== "number") {
+    end = now
+    start = now - (RANGE_DAYS[rangeKey] || RANGE_DAYS["3m"]) * DAY_MS
+  }
+  var span = end - start
+  var yMin = typeof chart.yMin === "number" ? chart.yMin : 75
+  var yMax = typeof chart.yMax === "number" ? chart.yMax : 100
+  if (!(span > 0) || !(yMax > yMin)) return null
+  var last = pts[pts.length - 1]
+  var t0 = start + last.x * span
+  var h0 = yMin + last.y * (yMax - yMin)
+  var monthMs = MONTH_DAYS * DAY_MS
+  var tFloor = h0 > floor ? t0 + (h0 - floor) / -rate * monthMs : t0
+  var tEnd = Math.min(tFloor, end)
+  if (!(tEnd > t0)) return null
+  var h = h0 + rate * (tEnd - t0) / monthMs
+  return {
+    x: Math.max(0, Math.min(1, (tEnd - start) / span)),
+    y: Math.max(0, Math.min(1, (h - yMin) / (yMax - yMin)))
   }
 }
 
@@ -541,7 +572,7 @@ if (typeof module !== "undefined" && module.exports) {
     parseChargeTypes: parseChargeTypes, parseSnapshot: parseSnapshot, healthPct: healthPct,
     HELPER_PATH: HELPER_PATH, actionResult: actionResult,
     parseHistory: parseHistory, dailyMedians: dailyMedians, wearRate: wearRate,
-    projectFloorDate: projectFloorDate, chartPoints: chartPoints, nextRange: nextRange,
+    projectFloorDate: projectFloorDate, chartPoints: chartPoints, projectionPoint: projectionPoint, nextRange: nextRange,
     formatMonthYear: formatMonthYear,
     parseThemeColors: parseThemeColors, semanticColors: semanticColors,
     settingsFrom: settingsFrom, settingsFromShellConfig: settingsFromShellConfig, evaluateAlerts: evaluateAlerts, limitModeIgnored: limitModeIgnored,

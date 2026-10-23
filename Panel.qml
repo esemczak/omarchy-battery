@@ -4,6 +4,7 @@ import Quickshell.Io
 import Quickshell.Services.UPower
 import qs.Commons
 import qs.Commons as Commons
+import QtQuick.Effects
 import qs.Ui
 import "Model.js" as Model
 
@@ -60,6 +61,74 @@ Panel {
   readonly property var chart: Model.chartPoints(samples, range, nowMs,
     { floor: healthFloor, warrantyEnd: settingsObj.warrantyEnd })
   readonly property string rangeLabel: range === "3m" ? "3 months" : (range === "1y" ? "1 year" : "All time")
+  readonly property var projection: Model.projectionPoint(chart, wear.perMonth, healthFloor, nowMs, range)
+
+  function tint(c, a) { return Qt.rgba(c.r, c.g, c.b, a) }
+
+  // ---- Open motion ----
+  // `intro` (0..1, OutCubic) drives the percentage count-up and the charge bar
+  // growing in. `revealMs` is a plain clock; each section turns it into its own
+  // 250 ms OutCubic fade + 4 px rise, 40 ms after the one above it.
+  property real intro: 1
+  property real revealMs: 10000
+  readonly property int revealSteps: 8
+  function revealProgress(order) {
+    var t = Math.max(0, Math.min(1, (revealMs - order * 40) / 250))
+    return 1 - Math.pow(1 - t, 3)
+  }
+  function revealShift(order) { return Style.space(4) * (1 - revealProgress(order)) }
+
+  NumberAnimation {
+    id: introAnim
+    target: root; property: "intro"
+    from: 0; to: 1; duration: 700; easing.type: Easing.OutCubic
+  }
+  NumberAnimation {
+    id: revealAnim
+    target: root; property: "revealMs"
+    from: 0; to: root.revealSteps * 40 + 250; duration: root.revealSteps * 40 + 250
+  }
+
+  // Gentle background pulse for the Fix button, only while open.
+  property real nudge: 0
+  SequentialAnimation on nudge {
+    running: root.opened && root.limitAlert !== null
+    loops: Animation.Infinite
+    NumberAnimation { from: 0; to: 1; duration: 1400; easing.type: Easing.InOutSine }
+    NumberAnimation { from: 1; to: 0; duration: 1400; easing.type: Easing.InOutSine }
+  }
+
+  readonly property var percentValue: {
+    var n = parseInt(String(batteryInfo.percentage || ""), 10)
+    return isNaN(n) ? null : n
+  }
+  readonly property string statsLeft: {
+    var parts = []
+    if (batteryInfo.size) parts.push(batteryInfo.size)
+    if (batteryInfo.cycles) parts.push(batteryInfo.cycles + " cycles")
+    return parts.join(" · ")
+  }
+  readonly property string statsRight: {
+    if (chargeThresholdActive) return "Holding · limit " + (batteryInfo.threshold || "-")
+    if (batteryFlowIdle) return ""
+    var parts = []
+    if (batteryInfo.time) parts.push(batteryInfo.time + (discharging ? " left" : " to full"))
+    if (batteryInfo.rate) parts.push(batteryInfo.rate)
+    return parts.join(" · ")
+  }
+  readonly property string wearValueText: wear.basis === "none" || wear.perMonth === null ? "—"
+    : (wear.perMonth < 0 ? "\u2212" : "") + Math.abs(wear.perMonth).toFixed(2)
+  readonly property string floorDateText: {
+    if (floorDate === null) return "—"
+    var s = Model.formatMonthYear(floorDate)
+    return s.slice(0, 4) + s.slice(-2)
+  }
+  readonly property string healthCaption: {
+    var parts = []
+    if (snapshot && snapshot.cycles !== null) parts.push(snapshot.cycles + " cycles")
+    if (snapshot && snapshot.tempC !== null) parts.push(snapshot.tempC + " °C")
+    return parts.join(" · ")
+  }
 
   function runHelper(args) {
     if (helperProc.running) return
@@ -267,6 +336,8 @@ Panel {
       }
 
       themePalette.reload()
+      introAnim.restart()
+      revealAnim.restart()
       refresh()
       var idx = profiles.indexOf(activeProfile)
       profileIndex = idx >= 0 ? idx : 0
@@ -480,32 +551,34 @@ Panel {
         Item {
           width: parent.width
           implicitHeight: Math.max(heroIcon.implicitHeight, heroLabels.implicitHeight, heroPercent.implicitHeight)
+          opacity: root.revealProgress(0)
+          transform: Translate { y: root.revealShift(0) }
 
           Text {
             id: heroIcon
             textFormat: Text.PlainText
             text: root.batteryIcon()
-            color: root.bar.foreground
+            color: themePalette.good
             font.family: root.bar.fontFamily
             font.pixelSize: Style.font.display
             anchors.left: parent.left
             anchors.verticalCenter: parent.verticalCenter
 
-            Behavior on color { ColorAnimation { duration: 200 } }
+            Behavior on color { ColorAnimation { duration: 200; easing.type: Easing.OutCubic } }
           }
 
           Column {
             id: heroLabels
             anchors.left: heroIcon.right
             anchors.leftMargin: Style.space(14)
-            anchors.right: heroPercent.left
+            anchors.right: heroPercentBox.left
             anchors.rightMargin: Style.space(10)
             anchors.verticalCenter: parent.verticalCenter
             spacing: Style.space(2)
 
             Text {
               text: "Battery"
-              color: root.bar.foreground
+              color: themePalette.text
               font.family: root.bar.fontFamily
               font.pixelSize: Style.font.title
               font.bold: true
@@ -517,7 +590,8 @@ Panel {
               id: heroStatus
               textFormat: Text.PlainText
               text: root.heroStatusText.toUpperCase()
-              color: Qt.darker(root.bar.foreground, 1.4)
+              color: themePalette.text
+              opacity: 0.6
               font.family: root.bar.fontFamily
               font.pixelSize: Style.font.caption
               font.bold: true
@@ -527,31 +601,64 @@ Panel {
             }
           }
 
-          Text {
-            id: heroPercent
-            textFormat: Text.PlainText
-            text: root.batteryInfo.percentage || "—"
-            color: root.bar.foreground
-            font.family: root.bar.fontFamily
-            font.pixelSize: Style.font.displayLarge
-            font.bold: true
+          // Big percentage: counts up on open; a text -> good gradient is masked
+          // through the glyphs.
+          Item {
+            id: heroPercentBox
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
+            width: heroPercent.implicitWidth
+            height: heroPercent.implicitHeight
 
-            Behavior on color { ColorAnimation { duration: 200 } }
+            Text {
+              id: heroPercent
+              anchors.fill: parent
+              textFormat: Text.PlainText
+              text: root.percentValue === null ? (root.batteryInfo.percentage || "—")
+                : Math.round(root.percentValue * root.intro) + "%"
+              color: themePalette.text
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.displayLarge
+              font.bold: true
+              visible: false
+              layer.enabled: true
+            }
+
+            Rectangle {
+              id: heroPercentFill
+              anchors.fill: parent
+              visible: false
+              layer.enabled: true
+              gradient: Gradient {
+                orientation: Gradient.Horizontal
+                GradientStop { position: 0.0; color: themePalette.text }
+                GradientStop { position: 1.0; color: themePalette.good }
+              }
+            }
+
+            MultiEffect {
+              anchors.fill: parent
+              source: heroPercentFill
+              maskEnabled: true
+              maskSource: heroPercent
+              maskThresholdMin: 0.5
+              maskSpreadAtMin: 1.0
+            }
           }
         }
 
         // ---------- Battery progress bar ----------
         Item {
           width: parent.width
-          implicitHeight: Style.space(8)
+          implicitHeight: Style.space(7)
+          opacity: root.revealProgress(1)
+          transform: Translate { y: root.revealShift(1) }
 
           Rectangle {
             id: barTrack
             anchors.fill: parent
             radius: height / 2
-            color: Qt.rgba(root.bar.foreground.r, root.bar.foreground.g, root.bar.foreground.b, 0.12)
+            color: root.tint(themePalette.text, 0.1)
           }
 
           Rectangle {
@@ -560,11 +667,19 @@ Panel {
             anchors.verticalCenter: barTrack.verticalCenter
             height: barTrack.height
             radius: barTrack.radius
-            color: root.batteryFillColor
-            width: Math.max(barTrack.height, barTrack.width * root.batteryFraction)
+            width: Math.max(barTrack.height, barTrack.width * root.batteryFraction) * root.intro
+            visible: width > 0.5
+            gradient: Gradient {
+              orientation: Gradient.Horizontal
+              GradientStop { position: 0.0; color: themePalette.warn }
+              GradientStop { position: 0.35; color: themePalette.neutral }
+              GradientStop { position: 1.0; color: themePalette.good }
+            }
 
-            Behavior on width { NumberAnimation { duration: 320; easing.type: Easing.OutCubic } }
-            Behavior on color { ColorAnimation { duration: 220 } }
+            Behavior on width {
+              enabled: !introAnim.running
+              NumberAnimation { duration: 300; easing.type: Easing.OutCubic }
+            }
 
             // Subtle pulse while charging — visible signal that energy is flowing in.
             SequentialAnimation on opacity {
@@ -577,35 +692,27 @@ Panel {
           }
         }
 
-        // ---------- Stats ----------
+        // ---------- Stats: one compact line ----------
         // Visibility is intentionally only gated by "we've ever loaded data" so
-        // the section never collapses mid-transition. fullyCharged is *not* part
+        // the line never collapses mid-transition. fullyCharged is *not* part
         // of the condition: UPower briefly reports FullyCharged on plug-in when
         // the battery sits above the charge-control start threshold, and we
         // refuse to flicker the whole panel for that ~1s window.
-        Row {
+        Item {
           visible: root.batteryInfo.percentage !== undefined
           width: parent.width
-          spacing: Style.space(20)
+          implicitHeight: statsLeftText.implicitHeight
+          opacity: root.revealProgress(2)
+          transform: Translate { y: root.revealShift(2) }
 
-          Column {
-            width: (parent.width - parent.spacing) / 2
-            spacing: Style.spacing.labelGap
-            InfoPair { label: "Battery size"; value: root.batteryInfo.size || "" }
-            InfoPair { label: "Charge cycles"; value: root.batteryInfo.cycles || "—" }
+          InfoLabel {
+            id: statsLeftText
+            anchors.left: parent.left
+            text: root.statsLeft
           }
-
-          Column {
-            width: (parent.width - parent.spacing) / 2
-            spacing: Style.spacing.labelGap
-            InfoPair {
-              label: root.chargeThresholdActive ? "Charge limit" : (root.discharging ? "Time left" : "Time to full")
-              value: root.chargeThresholdActive ? (root.batteryInfo.threshold || "-") : (root.batteryFlowIdle ? "-" : (root.batteryInfo.time || "—"))
-            }
-            InfoPair {
-              label: root.chargeThresholdActive ? "Battery state" : (root.discharging ? "Discharging" : "Charging")
-              value: root.chargeThresholdActive ? "Holding" : (root.batteryFull ? "-" : (root.batteryInfo.rate || ""))
-            }
+          InfoLabel {
+            anchors.right: parent.right
+            text: root.statsRight
           }
         }
 
@@ -614,6 +721,8 @@ Panel {
           visible: root.hasAlert
           width: parent.width
           spacing: Style.space(6)
+          opacity: root.revealProgress(3)
+          transform: Translate { y: root.revealShift(3) }
 
           Repeater {
             model: [
@@ -622,39 +731,76 @@ Panel {
             ].filter(function(e) { return e.alert !== null })
 
             Rectangle {
+              id: banner
               required property var modelData
               width: column.width
               implicitHeight: bannerRow.implicitHeight + Style.space(16)
-              radius: Style.cornerRadius
-              color: Qt.rgba(root.bar.foreground.r, root.bar.foreground.g, root.bar.foreground.b, 0.08)
+              radius: Style.space(4)
+              color: root.tint(themePalette.warn, 0.08)
+
+              // Slides in (fade + 6 px) when it appears and on every open.
+              property real slide: 0
+              opacity: slide
+              transform: Translate { y: -Style.space(6) * (1 - banner.slide) }
+              NumberAnimation {
+                id: slideIn
+                target: banner; property: "slide"
+                from: 0; to: 1; duration: 250; easing.type: Easing.OutCubic
+              }
+              Component.onCompleted: slideIn.restart()
+              Connections {
+                target: root
+                function onOpenedChanged() { if (root.opened) slideIn.restart() }
+              }
+
+              Rectangle {
+                anchors.left: parent.left
+                anchors.top: parent.top
+                anchors.bottom: parent.bottom
+                width: Style.space(3)
+                radius: Style.space(1)
+                color: themePalette.warn
+              }
 
               Row {
                 id: bannerRow
                 anchors.left: parent.left
                 anchors.right: parent.right
                 anchors.verticalCenter: parent.verticalCenter
-                anchors.leftMargin: Style.space(10)
+                anchors.leftMargin: Style.space(12)
                 anchors.rightMargin: Style.space(10)
                 spacing: Style.space(10)
 
                 Text {
+                  id: bannerIcon
+                  textFormat: Text.PlainText
+                  text: "\uDB80\uDC26"
+                  color: themePalette.warn
+                  font.family: root.bar.fontFamily
+                  font.pixelSize: Style.font.bodySmall
+                  anchors.verticalCenter: parent.verticalCenter
+                }
+
+                Text {
                   id: bannerText
                   textFormat: Text.PlainText
-                  text: "\uDB80\uDC26 " + (modelData.alert.text || "")
-                  color: root.bar.foreground
+                  text: banner.modelData.alert.text || ""
+                  color: themePalette.text
                   font.family: root.bar.fontFamily
                   font.pixelSize: Style.font.bodySmall
                   wrapMode: Text.WordWrap
                   anchors.verticalCenter: parent.verticalCenter
-                  width: parent.width - (fixButton.visible ? fixButton.width + parent.spacing : 0)
+                  width: parent.width - bannerIcon.width - parent.spacing
+                    - (fixButton.visible ? fixButton.width + parent.spacing : 0)
                 }
 
                 Button {
                   id: fixButton
-                  visible: modelData.key === "limitIgnored" && modelData.alert.reason === "mode" && root.helperPresent !== false
+                  visible: banner.modelData.key === "limitIgnored" && banner.modelData.alert.reason === "mode" && root.helperPresent !== false
                   text: "Fix"
                   fontSize: Style.font.bodySmall
-                  foreground: root.bar.foreground
+                  foreground: themePalette.warn
+                  background: root.tint(themePalette.warn, 0.14 * root.nudge)
                   fontFamily: root.bar.fontFamily
                   bordered: true
                   anchors.verticalCenter: parent.verticalCenter
@@ -669,12 +815,15 @@ Panel {
         PanelSeparator {
           visible: root.chargingAvailable
           foreground: root.bar.foreground
+          opacity: root.revealProgress(4)
         }
 
         Column {
           visible: root.chargingAvailable
           width: parent.width
           spacing: Style.space(10)
+          opacity: root.revealProgress(4)
+          transform: Translate { y: root.revealShift(4) }
 
           PanelSectionHeader {
             text: "CHARGING"
@@ -745,12 +894,15 @@ Panel {
         PanelSeparator {
           visible: root.snapshot !== null && root.snapshot.present
           foreground: root.bar.foreground
+          opacity: root.revealProgress(5)
         }
 
         Column {
           visible: root.snapshot !== null && root.snapshot.present
           width: parent.width
-          spacing: Style.space(10)
+          spacing: Style.space(8)
+          opacity: root.revealProgress(5)
+          transform: Translate { y: root.revealShift(5) }
 
           PanelSectionHeader {
             text: "HEALTH"
@@ -758,39 +910,88 @@ Panel {
             fontFamily: root.bar.fontFamily
           }
 
-          Column {
+          Row {
+            id: statCards
             width: parent.width
-            spacing: Style.spacing.labelGap
-            InfoPair { label: "Health"; value: root.healthValue === null || isNaN(root.healthValue) ? "—" : root.healthValue + "%" }
-            InfoPair {
-              label: "Wear"
-              value: root.wear.basis === "none" || root.wear.perMonth === null ? "—"
-                : Math.abs(root.wear.perMonth).toFixed(2) + "%/mo" + (root.wear.basis === "estimate" ? " (est.)" : "")
+            spacing: Style.space(6)
+            readonly property real cardWidth: (width - spacing * 2) / 3
+
+            StatCard {
+              value: root.healthValue === null || isNaN(root.healthValue) ? "—" : root.healthValue + "%"
+              valueColor: themePalette.neutral
+              label: "HEALTH"
             }
-            InfoPair { label: "Reaches " + root.healthFloor + "%"; value: root.floorDate === null ? "—" : Model.formatMonthYear(root.floorDate) }
-            InfoPair { label: "Cycles"; value: root.snapshot && root.snapshot.cycles !== null ? String(root.snapshot.cycles) : "—" }
-            InfoPair { label: "Temp"; value: root.snapshot && root.snapshot.tempC !== null ? root.snapshot.tempC + "°C" : "—" }
+            StatCard {
+              value: root.wearValueText
+              unit: root.wearValueText === "—" ? "" : "%/mo"
+              label: root.wear.basis === "estimate" ? "WEAR · EST." : "WEAR"
+            }
+            StatCard {
+              value: root.floorDateText
+              valueColor: root.degradationAlert !== null ? themePalette.warn : themePalette.good
+              label: "REACHES " + root.healthFloor + "%"
+            }
           }
 
           HealthChart {
             width: parent.width
             height: Style.space(70)
-            foreground: root.bar.foreground
+            palette: themePalette
+            opened: root.opened && root.batteryPresent
             fontFamily: root.bar.fontFamily
             chart: root.chart
-            rangeLabel: root.rangeLabel
+            projection: root.projection
+            floorLabel: root.healthFloor + "%"
             onClicked: root.range = Model.nextRange(root.range)
+          }
+
+          Item {
+            width: parent.width
+            implicitHeight: healthCaptionText.implicitHeight
+
+            Text {
+              id: healthCaptionText
+              anchors.left: parent.left
+              textFormat: Text.PlainText
+              text: root.healthCaption
+              color: themePalette.text
+              opacity: 0.6
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+            }
+            Text {
+              anchors.right: parent.right
+              textFormat: Text.PlainText
+              text: root.rangeLabel.toLowerCase() + " \u25B8"
+              color: themePalette.text
+              opacity: rangeArea.containsMouse ? 0.9 : 0.6
+              font.family: root.bar.fontFamily
+              font.pixelSize: Style.font.caption
+              Behavior on opacity { NumberAnimation { duration: 150; easing.type: Easing.OutCubic } }
+
+              MouseArea {
+                id: rangeArea
+                anchors.fill: parent
+                anchors.margins: -Style.space(4)
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: root.range = Model.nextRange(root.range)
+              }
+            }
           }
         }
 
         // ---------- Power use ----------
         PanelSeparator {
           foreground: root.bar.foreground
+          opacity: root.revealProgress(6)
         }
 
         Column {
           width: parent.width
           spacing: Style.space(10)
+          opacity: root.revealProgress(6)
+          transform: Translate { y: root.revealShift(6) }
 
           PanelSectionHeader {
             text: "POWER USE"
@@ -810,11 +1011,14 @@ Panel {
         // ---------- Power profile picker ----------
         PanelSeparator {
           foreground: root.bar.foreground
+          opacity: root.revealProgress(7)
         }
 
         Column {
           width: parent.width
           spacing: Style.space(10)
+          opacity: root.revealProgress(7)
+          transform: Translate { y: root.revealShift(7) }
 
           PanelSectionHeader {
             text: "POWER PROFILE"
@@ -834,8 +1038,12 @@ Panel {
             Repeater {
               model: root.profiles
               Button {
+                id: profileButton
                 required property var modelData
                 required property int index
+                readonly property bool isActive: root.activeProfile === modelData
+                property real activeness: isActive ? 1 : 0
+                Behavior on activeness { NumberAnimation { duration: 250; easing.type: Easing.OutCubic } }
                 width: profileRow.cellWidth
                 iconText: root.profileIcon(String(modelData))
                 iconSize: Style.font.title
@@ -845,8 +1053,6 @@ Panel {
                 fontFamily: root.bar.fontFamily
                 horizontalPadding: Style.spacing.controlPaddingX
                 verticalPadding: Style.spacing.controlPaddingY + Style.space(2)
-                bordered: true
-                active: root.activeProfile === modelData
                 hasCursor: root.cursorActive && root.profileIndex === index
                 onClicked: root.setProfile(modelData)
                 onHovered: function(h) {
@@ -854,6 +1060,19 @@ Panel {
                     root.cursorActive = true
                     root.profileIndex = index
                   }
+                }
+
+                // Quiet border; the active profile gets an accent border and a
+                // light accent tint. Drawn under the label; hover and the
+                // keyboard cursor keep the stock highlight on top.
+                Rectangle {
+                  z: -1
+                  anchors.fill: parent
+                  radius: Style.cornerRadius
+                  color: root.tint(themePalette.neutral, 0.1 * profileButton.activeness)
+                  border.width: 1
+                  border.color: Qt.tint(root.tint(themePalette.text, 0.16),
+                    root.tint(themePalette.neutral, profileButton.activeness))
                 }
               }
             }
@@ -863,30 +1082,69 @@ Panel {
     }
   }
 
-  component InfoPair: Row {
-    property string label: ""
-    property string value: ""
-
-    width: parent.width
-    spacing: Style.space(8)
-
-    InfoLabel { text: label }
-    Item { width: Math.max(0, parent.width - parent.children[0].implicitWidth - parent.children[2].implicitWidth - parent.spacing * 2); height: 1 }
-    InfoValue { text: value }
-  }
-
   component InfoLabel: Text {
     textFormat: Text.PlainText
-    color: root.bar.foreground
+    color: themePalette.text
     opacity: 0.6
     font.family: root.bar.fontFamily
     font.pixelSize: Style.font.bodySmall
   }
 
-  component InfoValue: Text {
-    textFormat: Text.PlainText
-    color: root.bar.foreground
-    font.family: root.bar.fontFamily
-    font.pixelSize: Style.font.bodySmall
+  // HEALTH stat card: big value (+ optional small unit) over a small label.
+  component StatCard: Rectangle {
+    property string value: ""
+    property string unit: ""
+    property string label: ""
+    property color valueColor: themePalette.text
+
+    width: statCards.cardWidth
+    implicitHeight: cardColumn.implicitHeight + Style.space(14)
+    radius: Style.space(6)
+    color: root.tint(themePalette.text, 0.04)
+
+    Column {
+      id: cardColumn
+      anchors.left: parent.left
+      anchors.right: parent.right
+      anchors.leftMargin: Style.space(8)
+      anchors.rightMargin: Style.space(6)
+      anchors.verticalCenter: parent.verticalCenter
+      spacing: Style.space(1)
+
+      Row {
+        width: parent.width
+        Text {
+          id: cardValue
+          textFormat: Text.PlainText
+          text: value
+          color: valueColor
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.title
+          font.bold: true
+          Behavior on color { ColorAnimation { duration: 250; easing.type: Easing.OutCubic } }
+        }
+        Text {
+          visible: unit !== ""
+          anchors.baseline: cardValue.baseline
+          textFormat: Text.PlainText
+          text: unit
+          color: valueColor
+          font.family: root.bar.fontFamily
+          font.pixelSize: Style.font.caption
+        }
+      }
+
+      Text {
+        width: parent.width
+        elide: Text.ElideRight
+        textFormat: Text.PlainText
+        text: label
+        color: themePalette.text
+        opacity: 0.6
+        font.family: root.bar.fontFamily
+        font.pixelSize: Style.font.caption
+        font.letterSpacing: 0.6
+      }
+    }
   }
 }

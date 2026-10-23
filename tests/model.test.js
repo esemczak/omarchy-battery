@@ -468,3 +468,44 @@ test("clampHandle keeps 1 <= start < end <= 100", () => {
   assert.equal(Model.clampHandle("start", 60.6, 50, 90), 61)
   assert.equal(Model.clampHandle("end", 70.2, 50, 90), 70)
 })
+
+// --- Projection line ---
+
+const projChart = () => {
+  const now = Date.UTC(2026, 9, 24)
+  const start = now - 300 * DAY
+  const end = now + 200 * DAY
+  const yMin = 75, yMax = 100
+  return { now, chart: { points: [{ x: 0.6, y: (90.3 - yMin) / (yMax - yMin), seed: false }], yMin, yMax, start, end, floorY: 0.2 } }
+}
+
+test("projectionPoint heads right and down toward the floor", () => {
+  const { now, chart } = projChart()
+  const p = Model.projectionPoint(chart, -1.0, 80, now, "all")
+  assert.ok(p !== null)
+  assert.ok(p.x > 0.6)
+  assert.ok(p.y < chart.points[0].y)
+  assert.ok(p.y >= chart.floorY - 1e-9)
+})
+
+test("projectionPoint is null without a falling rate or points", () => {
+  const { now, chart } = projChart()
+  assert.equal(Model.projectionPoint(chart, null, 80, now, "all"), null)
+  assert.equal(Model.projectionPoint(chart, 0.1, 80, now, "all"), null)
+  assert.equal(Model.projectionPoint(chart, 0, 80, now, "all"), null)
+  assert.equal(Model.projectionPoint(Object.assign({}, chart, { points: [] }), -1, 80, now, "all"), null)
+})
+
+test("projectionPoint clamps x to the domain end", () => {
+  const { now, chart } = projChart()
+  const p = Model.projectionPoint(chart, -0.01, 80, now, "all")
+  assert.equal(p.x, 1)
+  assert.ok(p.y < chart.points[0].y)
+})
+
+test("chartPoints exposes its time domain for the projection", () => {
+  const now = Date.UTC(2026, 9, 24)
+  const c = Model.chartPoints([{ t: now, health: 90 }], "3m", now)
+  assert.equal(c.end, now)
+  assert.equal(c.start, now - 92 * DAY)
+})
