@@ -78,6 +78,21 @@ check "history second run skipped" ha_skip
 check "history --force appends" ha_force
 check "history --force dedupes within 2s" ha_force_dedupe
 check "history --on-ac-change only on AC flip" ha_acchange
+ha_settle() { local s f o; s=$(mktemp -d); f=$(mktemp -d); cp -r tests/fixtures/sysfs/dell/. "$f/"; echo 0 >"$f/AC/online"
+  BATTERY_SYSFS=$f "$HA" "$s" >/dev/null
+  jq -c 'if .seed then . else .t -= 10000 end' "$s/history.jsonl" >"$s/h.tmp" && mv "$s/h.tmp" "$s/history.jsonl"
+  # the charger flag lags the event: flip it shortly after the script starts
+  ( sleep 0.4; echo 1 >"$f/AC/online" ) &
+  o=$(BATTERY_SYSFS=$f AC_SETTLE_MS=3000 "$HA" "$s" --on-ac-change=true); wait
+  local ok=1; [[ $o == appended ]] && jq -se '[.[]|select(.seed|not)]|last|.ac==true' "$s/history.jsonl" >/dev/null && ok=0
+  rm -rf "$s" "$f"; return $ok; }
+ha_settle_timeout() { local s f o t0 t1; s=$(mktemp -d); f=$(mktemp -d); cp -r tests/fixtures/sysfs/dell/. "$f/"; echo 0 >"$f/AC/online"
+  BATTERY_SYSFS=$f "$HA" "$s" >/dev/null
+  jq -c 'if .seed then . else .t -= 10000 end' "$s/history.jsonl" >"$s/h.tmp" && mv "$s/h.tmp" "$s/history.jsonl"
+  t0=$(date +%s%3N); o=$(BATTERY_SYSFS=$f AC_SETTLE_MS=600 "$HA" "$s" --on-ac-change=true); t1=$(date +%s%3N)
+  rm -rf "$s" "$f"; [[ $o == skipped ]] && (( t1 - t0 >= 500 && t1 - t0 < 3000 )); }
+check "history --on-ac-change=<expected> waits for the AC flag to settle" ha_settle
+check "history --on-ac-change=<expected> gives up after AC_SETTLE_MS" ha_settle_timeout
 check "history none -> absent" ha_none
 check "state-update merges" su_merge
 ha_corrupt() { local s o now; s=$(mktemp -d); now=$(date +%s%3N); printf '{"t":%s,"health":95}\n{"t":12,"hea\n' "$now" >"$s/history.jsonl"; o=$(BATTERY_SYSFS=tests/fixtures/sysfs/dell "$HA" "$s"); rm -rf "$s"; [[ $o == skipped ]]; }

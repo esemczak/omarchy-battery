@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.2.1 - 2026-10-24
+
+- Fix: plugging in a USB-C charger did not record a history sample. The charger
+  event arrives a second or two before the sysfs AC flag flips, so the sampler
+  read the old state. It now waits (up to 10 s) for the flag to match, and the
+  alert check runs after that sample.
+
 ## 0.2.0 - 2026-10-24
 
 - Panel restyle: colours now follow the current Omarchy theme, with subtle motion.

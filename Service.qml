@@ -52,15 +52,24 @@ Item {
 
   // ---- sampling -----------------------------------------------------------
 
-  function runSample(force) {
+  // force = an AC change; expectAc is the state UPower reported, which the
+  // script waits for because the sysfs AC flag lags the event on USB-C.
+  property bool pendingExpectAc: false
+  property bool checkAfterSample: false
+
+  function runSample(force, expectAc) {
     if (sampling) {
       // A forced sample must not be lost to a running one.
-      if (force) samplePending = true
+      if (force) {
+        samplePending = true
+        pendingExpectAc = expectAc === true
+      }
       return
     }
     sampling = true
+    checkAfterSample = force
     sampleProc.command = force
-      ? ["bash", pluginDir + "/bin/history-append.sh", dirPath, "--on-ac-change"]
+      ? ["bash", pluginDir + "/bin/history-append.sh", dirPath, "--on-ac-change=" + (expectAc === true)]
       : ["bash", pluginDir + "/bin/history-append.sh", dirPath]
     sampleProc.running = true
   }
@@ -69,9 +78,11 @@ Item {
     id: sampleProc
     onExited: function (code) {
       root.sampling = false
+      // The AC flag has settled by now, so the alert check sees the new state.
+      if (root.checkAfterSample) root.runCheck()
       if (root.samplePending) {
         root.samplePending = false
-        root.runSample(true)
+        root.runSample(true, root.pendingExpectAc)
       }
     }
   }
@@ -97,9 +108,9 @@ Item {
     target: UPower
     function onOnBatteryChanged() {
       // UPower reports its initial value as a change; the script only records
-      // a sample when AC state differs from the last real sample.
-      root.runSample(true)
-      root.runCheck()
+      // a sample when AC state differs from the last real sample. The alert
+      // check runs once that sample finishes.
+      root.runSample(true, !UPower.onBattery)
     }
   }
 

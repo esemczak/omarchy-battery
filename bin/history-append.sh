@@ -1,12 +1,22 @@
 #!/usr/bin/env bash
-# Usage: history-append.sh <stateDir> [--force | --on-ac-change]
+# Usage: history-append.sh <stateDir> [--force | --on-ac-change[=true|false]]
 # Append a battery Sample (and a seed on first run) to <stateDir>/history.jsonl.
 # Prints: appended | skipped | absent
 dir=${1:-}; force=${2:-}
-[[ -n $dir ]] || { echo "usage: $0 <stateDir> [--force]" >&2; exit 2; }
+[[ -n $dir ]] || { echo "usage: $0 <stateDir> [--force | --on-ac-change[=true|false]]" >&2; exit 2; }
 here=$(dirname "$0")
 
 snap=$("$here/battery-read.sh")
+# --on-ac-change=<expected>: on USB-C the charger event arrives a second or two
+# before the AC flag in sysfs flips, so re-read until it agrees (or give up).
+if [[ $force == --on-ac-change=true || $force == --on-ac-change=false ]]; then
+  expect=${force#--on-ac-change=}; force=--on-ac-change
+  deadline=$(( $(date +%s%3N) + ${AC_SETTLE_MS:-10000} ))
+  while [[ $(jq -r '.ac' <<<"$snap") != "$expect" ]] && (( $(date +%s%3N) < deadline )); do
+    sleep 0.5
+    snap=$("$here/battery-read.sh")
+  done
+fi
 if [[ $(jq -r '.present' <<<"$snap") != true ]]; then echo absent; exit 0; fi
 
 mkdir -p "$dir" || exit 1
