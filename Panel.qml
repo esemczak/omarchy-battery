@@ -21,6 +21,13 @@ Panel {
   readonly property var settingsObj: Model.settingsFrom(root.settings)
   property real nowMs: Date.now()
   property string range: "3m"
+  // The first history load picks the initial range (Model.defaultRange); after
+  // that, clicks cycle from wherever it is.
+  property bool rangeChosen: false
+  function cycleRange() {
+    rangeChosen = true
+    range = Model.nextRange(range)
+  }
   // null until the first `test -x` finishes; false shows the install hint.
   property var helperPresent: null
   property string actionMessage: ""
@@ -394,7 +401,13 @@ Panel {
     command: ["cat", root.stateDirPath + "/history.jsonl"]
     stdout: StdioCollector {
       waitForEnd: true
-      onStreamFinished: root.samples = Model.parseHistory(text, Date.now())
+      onStreamFinished: {
+        root.samples = Model.parseHistory(text, Date.now())
+        if (!root.rangeChosen) {
+          root.range = Model.defaultRange(root.samples, Date.now())
+          root.rangeChosen = true
+        }
+      }
     }
   }
 
@@ -942,7 +955,7 @@ Panel {
             chart: root.chart
             projection: root.projection
             floorLabel: root.healthFloor + "%"
-            onClicked: root.range = Model.nextRange(root.range)
+            onClicked: root.cycleRange()
           }
 
           Item {
@@ -975,7 +988,7 @@ Panel {
                 anchors.margins: -Style.space(4)
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: root.range = Model.nextRange(root.range)
+                onClicked: root.cycleRange()
               }
             }
           }

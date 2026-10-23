@@ -223,6 +223,16 @@ function projectFloorDate(health, perMonth, floor, now) {
 
 var RANGE_DAYS = { "3m": 92, "1y": 365 }
 
+// Initial chart range: "all" until real (non-seed) history spans 30 days,
+// so a young history still shows a line; "3m" after that.
+function defaultRange(samples, now) {
+  var real = (samples || []).filter(function (s) { return s && !s.seed && typeof s.t === "number" && s.t <= now + DAY_MS })
+  if (real.length < 2) return "all"
+  var first = Infinity, last = -Infinity
+  real.forEach(function (s) { first = Math.min(first, s.t); last = Math.max(last, s.t) })
+  return last - first >= 30 * DAY_MS ? "3m" : "all"
+}
+
 function nextRange(key) {
   if (key === "3m") return "1y"
   if (key === "1y") return "all"
@@ -243,6 +253,9 @@ function chartPoints(samples, rangeKey, now, opts) {
   var end = Math.max(now, visible.length ? visible[visible.length - 1].t : now)
   // Longer ranges reach out to the warranty end so its marker is visible ahead of time.
   if (rangeKey !== "3m" && typeof o.warrantyEnd === "number" && o.warrantyEnd > end) end = o.warrantyEnd
+  // Otherwise leave 20 % forward headroom so the latest point sits inside the
+  // chart and the projection has somewhere to go.
+  else end = end + 0.2 * (end - start)
   var span = end - start
   function xOf(t) { return span > 0 ? Math.max(0, Math.min(1, (t - start) / span)) : 1 }
   var minHealth = visible.reduce(function (m, s) { return Math.min(m, s.health) }, Infinity)
@@ -572,7 +585,7 @@ if (typeof module !== "undefined" && module.exports) {
     parseChargeTypes: parseChargeTypes, parseSnapshot: parseSnapshot, healthPct: healthPct,
     HELPER_PATH: HELPER_PATH, actionResult: actionResult,
     parseHistory: parseHistory, dailyMedians: dailyMedians, wearRate: wearRate,
-    projectFloorDate: projectFloorDate, chartPoints: chartPoints, projectionPoint: projectionPoint, nextRange: nextRange,
+    projectFloorDate: projectFloorDate, chartPoints: chartPoints, projectionPoint: projectionPoint, nextRange: nextRange, defaultRange: defaultRange,
     formatMonthYear: formatMonthYear,
     parseThemeColors: parseThemeColors, semanticColors: semanticColors,
     settingsFrom: settingsFrom, settingsFromShellConfig: settingsFromShellConfig, evaluateAlerts: evaluateAlerts, limitModeIgnored: limitModeIgnored,

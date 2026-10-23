@@ -293,7 +293,8 @@ test("chartPoints maps samples into the range window", () => {
   assert.equal(all.points.length, 2)
   assert.equal(all.points[0].seed, true)
   assert.equal(all.points[0].x, 0)
-  assert.equal(all.points[1].x, 1)
+  // No warranty extension here, so 20 % forward headroom puts the latest at 1/1.2.
+  assert.ok(Math.abs(all.points[1].x - 1 / 1.2) < 1e-9)
   assert.equal(all.points[1].seed, false)
   assert.equal(all.yMax, 100)
   assert.equal(all.yMin, 75)
@@ -506,6 +507,36 @@ test("projectionPoint clamps x to the domain end", () => {
 test("chartPoints exposes its time domain for the projection", () => {
   const now = Date.UTC(2026, 9, 24)
   const c = Model.chartPoints([{ t: now, health: 90 }], "3m", now)
-  assert.equal(c.end, now)
   assert.equal(c.start, now - 92 * DAY)
+  assert.equal(c.end, now + 0.2 * 92 * DAY)
+})
+
+test("3m with the latest sample at now leaves room for the projection", () => {
+  const now = Date.UTC(2026, 9, 24)
+  const samples = [{ t: now - 40 * DAY, health: 91 }, { t: now, health: 90.3 }]
+  const c = Model.chartPoints(samples, "3m", now, { floor: 80, warrantyEnd: Date.UTC(2027, 3, 30) })
+  const latest = c.points[c.points.length - 1]
+  assert.ok(latest.x < 1)
+  assert.ok(Math.abs(latest.x - 1 / 1.2) < 1e-9)
+  const p = Model.projectionPoint(c, -1.0, 80, now, "3m")
+  assert.ok(p !== null)
+  assert.ok(p.x > latest.x && p.x <= 1)
+  assert.ok(p.y < latest.y)
+})
+
+test("headroom is not added when the warranty end already extends the domain", () => {
+  const now = Date.UTC(2026, 9, 24)
+  const w = Date.UTC(2027, 3, 30)
+  const c = Model.chartPoints([{ t: now, health: 90 }], "all", now, { warrantyEnd: w })
+  assert.equal(c.end, w)
+})
+
+test("defaultRange: all for short real history, 3m once it spans 30+ days", () => {
+  const now = Date.UTC(2026, 9, 24)
+  const seed = { t: Date.UTC(2025, 11, 30), health: 100, seed: true }
+  assert.equal(Model.defaultRange([seed, { t: now - 2 * DAY, health: 90.4 }, { t: now, health: 90.3 }], now), "all")
+  assert.equal(Model.defaultRange([], now), "all")
+  const sixty = []
+  for (let d = 60; d >= 0; d--) sixty.push({ t: now - d * DAY, health: 91 - d / 60 })
+  assert.equal(Model.defaultRange([seed].concat(sixty), now), "3m")
 })
